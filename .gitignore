@@ -1,0 +1,139 @@
+# -------------------------
+# OS / Editor / IDE
+# -------------------------
+.DS_Store
+Thumbs.db
+
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+*.tmp
+
+# -------------------------
+# Secrets / Env
+# -------------------------
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+*.p12
+*.pfx
+secrets/
+credentials/
+*.secret
+
+# -------------------------
+# Logs
+# -------------------------
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# -------------------------
+# Build / Dist
+# -------------------------
+dist/
+build/
+out/
+target/
+coverage/
+.cache/
+.tmp/
+temp/
+
+# -------------------------
+# Node.js
+# -------------------------
+node_modules/
+.npm/
+.pnpm-store/
+.yarn/
+.yarn-cache/
+.yarn-unplugged/
+.yarn-build-state.yml
+.yarn-install-state.gz
+
+# -------------------------
+# Python
+# -------------------------
+__pycache__/
+*.py[cod]
+*.pyd
+*.pyo
+*.egg-info/
+.eggs/
+.venv/
+venv/
+ENV/
+pip-wheel-metadata/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.pyre/
+.ipynb_checkpoints/
+
+# -------------------------
+# Java / Kotlin / Gradle / Maven
+# -------------------------
+*.class
+*.jar
+*.war
+*.ear
+.gradle/
+build/
+target/
+
+# -------------------------
+# Go
+# -------------------------
+bin/
+*.exe
+*.test
+*.out
+
+# -------------------------
+# Rust
+# -------------------------
+target/
+
+# -------------------------
+# C/C++
+# -------------------------
+*.o
+*.a
+*.so
+*.dylib
+*.dll
+*.exe
+
+# -------------------------
+# Docker / Containers
+# -------------------------
+**/.docker/*
+docker-data/
+**/data/
+**/tmp/
+**/log/
+*.pid
+
+# -------------------------
+# Databases / Large artifacts
+# -------------------------
+*.sqlite
+*.sqlite3
+*.db
+*.dump
+*.bak
+
+# -------------------------
+# Local config
+# -------------------------
+config.local.*
+*.local
+local.settings.json
