@@ -3,11 +3,13 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 import shutil
 import subprocess
 import time
 from datetime import datetime
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Set
+from uuid import uuid4
 
 import httpx
 
@@ -26,6 +28,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 _DOCKER_BIN = shutil.which("docker")
+_SLUG_PATTERN = re.compile(r"[^a-z0-9]+")
 
 
 def _docker_cli_available() -> bool:
@@ -78,6 +81,54 @@ async def _inspect_container(container: Optional[str]) -> Dict:
         return {"error": "docker CLI not found"}
     loop = asyncio.get_running_loop()
     return await loop.run_in_executor(None, _inspect_container_sync, container)
+
+
+def _list_containers_sync() -> List[Dict]:
+    cmd = ["docker", "ps", "--all", "--format", "{{json .}}"]
+    try:
+        proc = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=8,
+            check=False,
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("failed to list docker containers: %s", exc)
+        return []
+
+    if proc.returncode != 0:
+        logger.warning("docker ps returned %s: %s", proc.returncode, proc.stderr.strip())
+        return []
+
+    containers: List[Dict] = []
+    for line in proc.stdout.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            containers.append(json.loads(line))
+        except json.JSONDecodeError:
+            continue
+    return containers
+
+
+async def _list_containers() -> List[Dict]:
+    if not _docker_cli_available():
+        return []
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(None, _list_containers_sync)
+
+
+def _auto_slug(source: str, known: Set[str]) -> str:
+    text = (source or "").strip().lower()
+    text = _SLUG_PATTERN.sub("-", text)
+    text = text.strip("-") or uuid4().hex[:6]
+    slug = f"auto-{text}"
+    while slug in known:
+        slug = f"{slug}-{uuid4().hex[:4]}"
+    known.add(slug)
+    return slug
 
 
 async def _probe_http(
@@ -218,9 +269,44 @@ async def _build_service_status(cfg: DockerServiceConfig) -> DockerServiceStatus
     )
 
 
+async def _discover_untracked_services(
+    known_containers: Set[str],
+    known_slugs: Set[str],
+) -> List[DockerServiceConfig]:
+    if not _docker_cli_available():
+        return []
+    containers = await _list_containers()
+    auto_configs: List[DockerServiceConfig] = []
+    for payload in containers:
+        container_name = (payload.get("Names") or "").strip()
+        if not container_name:
+            continue
+        if container_name in known_containers:
+            continue
+        slug = _auto_slug(container_name, known_slugs)
+        auto_configs.append(
+            DockerServiceConfig(
+                slug=slug,
+                name=payload.get("Names") or payload.get("Image") or container_name,
+                container=container_name,
+                description=payload.get("Image"),
+                access_url=None,
+                icon=None,
+                tags=[],
+                require_probe=False,
+                managed=False,
+            )
+        )
+    return auto_configs
+
+
 async def get_docker_overview() -> DockerOverview:
     configs = load_service_configs()
-    tasks = [_build_service_status(cfg) for cfg in configs]
+    known_containers: Set[str] = {cfg.container for cfg in configs if cfg.container}
+    known_slugs: Set[str] = {cfg.slug for cfg in configs}
+    auto_configs = await _discover_untracked_services(known_containers, known_slugs)
+    all_configs = configs + auto_configs
+    tasks = [_build_service_status(cfg) for cfg in all_configs]
     services = await asyncio.gather(*tasks) if tasks else []
 
     total = len(services)

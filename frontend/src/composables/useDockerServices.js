@@ -38,6 +38,14 @@ export function useDockerServices() {
     await load()
   }
 
+  async function getBySlug(slug) {
+    if (!slug) return null
+    if (!services.value.length || !services.value.find((svc) => svc.slug === slug)) {
+      await load()
+    }
+    return services.value.find((svc) => svc.slug === slug) || null
+  }
+
   return {
     services,
     loading,
@@ -46,5 +54,6 @@ export function useDockerServices() {
     create,
     update,
     remove,
+    getBySlug,
   }
 }

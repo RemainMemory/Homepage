@@ -48,17 +48,30 @@ npm run dev -- --host
 
 ## Docker 服务监控
 
-- 服务清单写在 `backend/app/config/docker_services.yaml`，也可以在前端 `/docker` 页面通过表单增删，表单会直接调用 `/docker/services` API 写回该文件。配置项包括：
-  - `name`：展示名称
-  - `container`：对应 docker 容器名，用于 `docker inspect`
-  - `probe_url` + `probe_method`：可选的 HTTP 探活地址，支持自定义状态码 `expect_status`
-  - `access_url`：前端“快捷接入”按钮链接
--  - `require_probe`: `true` 时必须探活成功才算在线，`false` 则以容器运行状态为主
--  - `stats`：可选扩展统计，目前内置 `type: emby`（需要配置 `url` 与 `api_key`，页面会展示正在播放/影片数等）
+- 服务清单写在 `backend/app/config/docker_services.yaml`。只要写 `name` + `access_url` 就能渲染卡片，其它字段都可选：
+
+```yaml
+services:
+  - name: Emby Server
+    description: 多媒体服务
+    access_url: https://emby.example.com
+    icon: https://www.google.com/s2/favicons?sz=128&domain_url=https://emby.example.com
+    tags: [media]
+    container: emby
+    probe:
+      url: https://emby.example.com/status   # 仅需 URL，method/timeout 会自动填
+    stats:
+      type: emby
+      url: https://emby.example.com
+      api_key: YOUR_EMBY_TOKEN
+```
+
+- 需要实时探活时，只写 `probe.url` 即可，其余会在后端套用默认值；`require_probe` 默认 `false`，如无特殊需求可以不写。
+- 需要扩展统计（例如 Emby 正在播放）时配置 `stats` 字段，未配置时前端不会展示统计。
+- `/docker` 页面新增的“添加服务”弹窗默认只有 3 个必填项，其它高级选项（容器、标签、自定义图标）可折叠展开后填写；表单保存后仍然写回该 YAML 文件。
+- 如果主机安装了 docker CLI，系统会自动枚举当前 Docker 容器并生成“临时”卡片，即使它们未写进 `docker_services.yaml` 也能看到运行状态（标记为 `managed: false`，不会落盘）。
 - 后端会并发执行 `docker inspect + HTTP 探活` 并兜底第三方统计接口。若系统未安装 docker CLI，会展示 `docker CLI not found` 提示并仅依赖探活结果。
-- 前端：
-  - 首页新增“Docker 服务”卡片，显示运行中/在线/异常数量、标签、扩展统计，并提供快捷入口。
-  - `/docker` 页面以卡片形式显示每个服务的在线状态、延迟、扩展统计（例如 Emby 正在播放），并附带复制探活、打开面板、删除等操作；下方管理区可以增删配置，无需手改 YAML。
+- 首页和 `/docker` 页面都会展示按卡片排布的服务状态，离线/在线状态即刻可见。
 
 ## 常见问题
 

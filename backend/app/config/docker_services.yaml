@@ -1,40 +1,48 @@
 services:
-  - slug: homepage
-    name: "Homepage"
-    container: "homepage"
-    description: "当前仪表盘服务"
-    access_url: "http://127.0.0.1:5173"
-    icon: "mdi-home"
-    tags: ["dashboard"]
-    probe:
-      url: "http://127.0.0.1:5173"
-      method: "GET"
-      timeout: 2
-    require_probe: true
-  - slug: npm
-    name: "Nginx Proxy Manager"
-    container: "nginx-proxy-manager"
-    description: "反向代理管理面板"
-    access_url: "https://npm.chenfeiyu.cc:55110"
-    icon: "mdi-shield-link-variant"
-    tags: ["reverse-proxy"]
-    probe:
-      url: "https://npm.chenfeiyu.cc:55110"
-      method: "GET"
-      timeout: 3
-    require_probe: false
-  - slug: emby
-    name: "Emby Server"
-    container: "emby"
-    description: "多媒体服务器"
-    access_url: "https://emby.chenfeiyu.cc:55110"
-    icon: "mdi-television"
-    tags: ["media"]
-    probe:
-      url: "https://emby.chenfeiyu.cc:55110/emby/System/Info"
-      method: "GET"
-      timeout: 3
-    stats:
-      type: "emby"
-      url: "https://emby.chenfeiyu.cc:55110/emby"
-      api_key: "PUT_YOUR_EMBY_API_KEY_HERE"
+- slug: homepage
+  name: Homepage
+  description: 当前仪表盘服务
+  access_url: http://127.0.0.1:5173
+  icon: https://www.google.com/s2/favicons?sz=128&domain_url=http://127.0.0.1:5173
+  container: homepage
+  tags:
+  - dashboard
+  require_probe: false
+  managed: true
+- slug: npm
+  name: Nginx Proxy Manager
+  description: 反向代理管理面板
+  access_url: https://npm.chenfeiyu.cc:55110
+  icon: https://www.google.com/s2/favicons?sz=128&domain_url=https://npm.chenfeiyu.cc
+  container: nginx-proxy-manager
+  tags:
+  - reverse-proxy
+  probe:
+    url: https://npm.chenfeiyu.cc:55110
+  require_probe: false
+  managed: true
+- slug: emby
+  name: Emby Server
+  description: 多媒体服务器
+  access_url: http://192.168.50.7:8096
+  icon: https://www.google.com/s2/favicons?sz=128&domain_url=http://192.168.50.7:8096
+  container: emby
+  tags:
+  - media
+  probe:
+    url: http://192.168.50.7:8096
+  stats:
+    type: emby
+    url: http://192.168.50.7:8096
+    api_key: CHANGE_ME
+  require_probe: false
+  managed: true
+- slug: nextcloud
+  name: Nextcloud
+  description: 个人云盘
+  access_url: http://192.168.50.7:9999
+  icon: https://www.google.com/s2/favicons?sz=128&domain_url=http://192.168.50.7:9999
+  tags:
+  - storage
+  require_probe: false
+  managed: true

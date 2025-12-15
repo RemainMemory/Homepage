@@ -1,60 +1,36 @@
 <template>
-  <article class="docker-service-card" :class="{ 'docker-service-card--down': !service.online }">
-    <div class="card-body">
-      <div class="service-header">
-        <div class="service-icon">{{ iconDisplay }}</div>
-        <div class="service-info">
-          <div class="service-title">
-            {{ service.name }}
-            <span v-if="service.state" class="service-state">{{ service.state }}</span>
-          </div>
-          <p class="service-desc">{{ service.description || service.status_text || '无描述' }}</p>
-          <div v-if="service.tags?.length" class="service-tags">
-            <span v-for="tag in service.tags" :key="tag">#{{ tag }}</span>
-          </div>
-        </div>
-        <div class="service-status">
-          <span class="status-dot" :class="service.online ? 'status-dot--ok' : 'status-dot--down'"></span>
-          <span>{{ service.online ? '在线' : '离线' }}</span>
-        </div>
-      </div>
-
-      <ul class="service-metrics">
-        <li>
-          <span class="metric-label">延迟</span>
-          <span class="metric-value">{{ latencyDisplay }}</span>
-        </li>
-        <li>
-          <span class="metric-label">响应</span>
-          <span class="metric-value">{{ service.response_code ?? '--' }}</span>
-        </li>
-        <li>
-          <span class="metric-label">最后探测</span>
-          <span class="metric-value">{{ lastCheckedDisplay }}</span>
-        </li>
-      </ul>
+  <article
+    class="docker-service-card"
+    :class="{ 'docker-service-card--offline': !service.online }"
+    @click="openPanel"
+  >
+    <div class="floating-controls">
+      <span
+        class="status-chip"
+        :class="service.online ? 'status-chip--online' : 'status-chip--offline'"
+      >
+        <span class="status-dot" />
+        {{ service.online ? '运行中' : '已离线' }}
+      </span>
+      <button class="card-edit" type="button" @click.stop="$emit('edit', service)" title="编辑">
+        ✎
+      </button>
+    </div>
+    <div class="service-icon" :class="{ 'service-icon--image': !!iconImage }">
+      <img v-if="iconImage" :src="iconImage" :alt="`${service.name} logo`" />
+      <span v-else>{{ iconLetter }}</span>
     </div>
 
-    <div class="service-actions">
-      <a
-        v-if="service.access_url"
-        :href="service.access_url"
-        class="action-btn"
-        target="_blank"
-        rel="noreferrer"
-      >
-        面板
-      </a>
-      <button
-        v-if="service.endpoint"
-        class="action-btn"
-        @click="$emit('open-api', service.endpoint)"
-      >
-        API
-      </button>
-      <button v-if="service.endpoint" class="action-btn action-btn--ghost" @click="$emit('copy', service)">
-        复制 API
-      </button>
+    <div class="service-body">
+      <div class="service-top">
+        <div class="service-title">
+          <h3>{{ service.name }}</h3>
+          <p v-if="description" class="service-desc">{{ description }}</p>
+        </div>
+      </div>
+      <div class="service-meta" v-if="metaBadges.length">
+        <span v-for="badge in metaBadges" :key="badge">{{ badge }}</span>
+      </div>
     </div>
   </article>
 </template>
@@ -69,183 +45,242 @@ const props = defineProps({
   },
 })
 
-defineEmits(['copy', 'open-api'])
+defineEmits(['edit'])
 
-const iconDisplay = computed(() => {
+function openPanel() {
+  if (!props.service.access_url) return
+  window.open(props.service.access_url, '_blank', 'noreferrer noopener')
+}
+
+const description = computed(() => props.service.description || props.service.status_text || '')
+
+const iconImage = computed(() => {
   const icon = props.service.icon
-  if (!icon) return '🐳'
-  if (icon.startsWith('mdi-')) {
-    const text = icon.replace('mdi-', '')
-    return text ? text[0].toUpperCase() : 'M'
+  if (icon && /^(https?:)?\/\//.test(icon)) {
+    return icon
   }
-  return icon
+  if (icon && icon.startsWith('data:')) {
+    return icon
+  }
+  if (props.service.access_url) {
+    try {
+      const url = new URL(props.service.access_url)
+      return `https://www.google.com/s2/favicons?sz=128&domain_url=${url.origin}`
+    } catch (e) {
+      // ignore invalid url
+    }
+  }
+  return null
+})
+
+const iconLetter = computed(() => {
+  const text = props.service.name?.trim()
+  if (text) return text[0]?.toUpperCase()
+  return 'D'
+})
+
+const hostDisplay = computed(() => {
+  if (!props.service.access_url) return null
+  try {
+    const url = new URL(props.service.access_url)
+    return url.hostname
+  } catch (e) {
+    return props.service.access_url
+  }
 })
 
 const latencyDisplay = computed(() => {
   const latency = props.service.latency_ms
-  if (latency === null || latency === undefined) return '--'
-  if (latency >= 1000) return `${(latency / 1000).toFixed(1)} s`
-  return `${latency.toFixed(1)} ms`
+  if (latency === null || latency === undefined) return null
+  if (latency >= 1000) return `${(latency / 1000).toFixed(1)}s`
+  return `${latency.toFixed(1)}ms`
 })
 
-const lastCheckedDisplay = computed(() => {
-  if (!props.service.last_checked) return '--'
-  const date = new Date(props.service.last_checked)
-  if (Number.isNaN(date.getTime())) return props.service.last_checked
-  return date.toLocaleTimeString()
+const badgeTag = computed(() => {
+  if (props.service.tags && props.service.tags.length) {
+    return props.service.tags[0]
+  }
+  if (props.service.container) {
+    return props.service.container
+  }
+  return null
+})
+
+const metaBadges = computed(() => {
+  return [hostDisplay.value, latencyDisplay.value, badgeTag.value].filter(Boolean)
 })
 </script>
 
 <style scoped>
 .docker-service-card {
-  border: 1px solid rgba(148, 163, 184, 0.25);
-  border-radius: 1.1rem;
-  padding: 1rem;
+  position: relative;
   display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-  background: rgba(15, 23, 42, 0.6);
+  gap: 1rem;
+  padding: 1.2rem 1.4rem;
+  border-radius: 1.2rem;
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  background: radial-gradient(circle at 0% 0%, rgba(59, 130, 246, 0.08), transparent 55%),
+    linear-gradient(135deg, rgba(15, 23, 42, 0.94), rgba(17, 24, 39, 0.9));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02), 0 18px 40px rgba(2, 6, 23, 0.45);
+  transition: transform 0.25s ease, border-color 0.25s ease, box-shadow 0.3s ease;
+  overflow: hidden;
 }
 
-.docker-service-card--down {
-  border-color: rgba(248, 113, 113, 0.4);
-  background: rgba(15, 23, 42, 0.45);
+.docker-service-card:hover {
+  transform: translateY(-4px);
+  border-color: rgba(96, 165, 250, 0.45);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 24px 50px rgba(15, 23, 42, 0.7);
 }
 
-.card-header {
-  display: flex;
-  justify-content: space-between;
-  gap: 0.5rem;
+.docker-service-card--offline {
+  border-color: rgba(248, 113, 113, 0.3);
+  background: radial-gradient(circle at 0% 0%, rgba(248, 113, 113, 0.08), transparent 55%),
+    linear-gradient(135deg, rgba(24, 24, 35, 0.95), rgba(14, 19, 30, 0.92));
 }
 
-.service-header {
+.floating-controls {
+  position: absolute;
+  top: 0.85rem;
+  right: 0.9rem;
   display: flex;
-  gap: 0.75rem;
   align-items: center;
+  gap: 0.4rem;
+  z-index: 4;
+}
+
+.card-edit {
+  border: none;
+  background: rgba(15, 23, 42, 0.45);
+  border-radius: 999px;
+  width: 28px;
+  height: 28px;
+  color: #cbd5f5;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+
+.card-edit:hover {
+  color: #f8fafc;
+  background: rgba(59, 130, 246, 0.5);
 }
 
 .service-icon {
-  width: 46px;
-  height: 46px;
-  border-radius: 12px;
-  background: rgba(59, 130, 246, 0.15);
+  width: 58px;
+  height: 58px;
+  border-radius: 16px;
+  background: rgba(15, 23, 42, 0.7);
+  border: 1px solid rgba(148, 163, 184, 0.18);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.6rem;
+  font-size: 1.35rem;
+  font-weight: 600;
+  color: #e2e8f0;
+  z-index: 2;
+  transition: transform 0.25s ease;
 }
 
-.service-info {
+.docker-service-card:hover .service-icon {
+  transform: translateY(-2px);
+}
+
+.service-icon--image {
+  padding: 6px;
+  background: rgba(13, 16, 28, 0.85);
+}
+
+.service-icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.service-body {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 0.18rem;
+  gap: 0.55rem;
+  z-index: 2;
   min-width: 0;
 }
 
-.service-title {
-  font-size: 1rem;
-  font-weight: 600;
+.service-top {
   display: flex;
-  align-items: center;
-  gap: 0.35rem;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: flex-start;
 }
 
-.service-state {
-  padding: 0.1rem 0.5rem;
-  border-radius: 999px;
-  background: rgba(148, 163, 184, 0.2);
-  font-size: 0.7rem;
-  text-transform: uppercase;
+
+.service-title h3 {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: #f1f5f9;
 }
 
 .service-desc {
-  margin: 0;
-  font-size: 0.8rem;
-  opacity: 0.75;
+  margin: 0.2rem 0 0;
+  font-size: 0.82rem;
+  color: rgba(226, 232, 240, 0.75);
 }
 
-.service-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.3rem;
-}
-
-.service-tags span {
-  font-size: 0.7rem;
-  padding: 0.1rem 0.4rem;
-  border-radius: 999px;
-  background: rgba(94, 234, 212, 0.12);
-  color: #a5f3fc;
-}
-
-.service-status {
-  display: flex;
+.status-chip {
+  display: inline-flex;
   align-items: center;
   gap: 0.35rem;
+  padding: 0.15rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.82rem;
   font-weight: 600;
+  border: 1px solid transparent;
+  background: rgba(15, 23, 42, 0.9);
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.05);
+}
+
+
+.status-chip--online {
+  color: #4ade80;
+  border-color: rgba(34, 197, 94, 0.4);
+  background: rgba(22, 101, 52, 0.35);
+}
+
+.status-chip--offline {
+  color: #f87171;
+  border-color: rgba(248, 113, 113, 0.45);
+  background: rgba(127, 29, 29, 0.3);
 }
 
 .status-dot {
-  width: 10px;
-  height: 10px;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
-  background: #94a3b8;
+  background: currentColor;
+  box-shadow: 0 0 8px currentColor;
 }
 
-.status-dot--ok {
-  background: #22c55e;
-  box-shadow: 0 0 8px rgba(34, 197, 94, 0.8);
-}
-
-.status-dot--down {
-  background: #ef4444;
-  box-shadow: 0 0 8px rgba(239, 68, 68, 0.7);
-}
-
-.service-metrics {
-  margin: 0.6rem 0 0;
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.35rem;
-  list-style: none;
-  padding: 0;
-}
-
-.service-metrics li {
-  padding: 0.4rem 0.5rem;
-  border-radius: 0.75rem;
-  background: rgba(15, 23, 42, 0.5);
-  border: 1px solid rgba(148, 163, 184, 0.2);
-}
-
-.metric-label {
-  font-size: 0.72rem;
-  opacity: 0.7;
-}
-
-.metric-value {
-  font-weight: 600;
-}
-
-.service-actions {
-  margin-top: 0.8rem;
+.service-meta {
   display: flex;
+  flex-wrap: wrap;
   gap: 0.5rem;
-}
-
-.action-btn {
-  padding: 0.3rem 0.75rem;
-  border-radius: 999px;
-  background: rgba(59, 130, 246, 0.2);
-  border: 1px solid rgba(59, 130, 246, 0.35);
-  color: #bfdbfe;
   font-size: 0.78rem;
+  color: rgba(226, 232, 240, 0.7);
 }
 
-.action-btn--ghost {
-  background: transparent;
-  border-color: rgba(148, 163, 184, 0.4);
-  color: #e2e8f0;
+.service-meta span {
+  position: relative;
+  padding-left: 0.75rem;
+}
+
+.service-meta span:first-child {
+  padding-left: 0;
+}
+
+.service-meta span:not(:first-child)::before {
+  content: '•';
+  position: absolute;
+  left: 0;
+  color: rgba(148, 163, 184, 0.4);
 }
 </style>
